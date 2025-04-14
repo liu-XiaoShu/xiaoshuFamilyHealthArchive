@@ -4,96 +4,91 @@
 """
 
 from django.core.files.storage import FileSystemStorage
-from django.conf import settings
+from django.core.exceptions import ValidationError
 from cryptography.fernet import Fernet
 import os
-import base64
-from pathlib import Path
+from django.conf import settings
+from django.utils.deconstruct import deconstructible
 
+@deconstructible
 class EncryptedFileStorage(FileSystemStorage):
     """
     加密文件存储类
-    使用Fernet对称加密算法加密文件内容
+    使用Fernet对称加密算法对敏感文件进行加密存储
     """
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 从环境变量获取或生成加密密钥
-        key = os.getenv('FILE_ENCRYPTION_KEY')
-        if not key:
-            key = Fernet.generate_key()
-            os.environ['FILE_ENCRYPTION_KEY'] = key.decode()
-        else:
-            key = key.encode()
-        self.fernet = Fernet(key)
-        
+    def __init__(self, location=None, base_url=None):
+        super().__init__(location, base_url)
+        self.key = Fernet.generate_key()
+        self.cipher_suite = Fernet(self.key)
+
+    def _validate_file_type(self, file):
+        """验证文件类型"""
+        allowed_types = [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ]
+        if file.content_type not in allowed_types:
+            raise ValidationError('不支持的文件类型')
+
+    def _get_encrypted_name(self, name):
+        """生成加密文件名"""
+        return f"{name}.enc"
+
     def _save(self, name, content):
-        """
-        重写保存方法，在保存前加密文件内容
-        """
-        # 读取文件内容
-        content.seek(0)
-        file_content = content.read()
+        """保存加密文件"""
+        self._validate_file_type(content)
         
-        # 加密内容
-        encrypted_content = self.fernet.encrypt(file_content)
+        # 获取原始文件扩展名
+        ext = os.path.splitext(name)[1]
         
-        # 构建加密文件路径
-        encrypted_name = name + '.encrypted'
+        # 加密文件内容
+        encrypted_content = self.cipher_suite.encrypt(content.read())
         
-        # 创建目标目录（如果不存在）
-        path = Path(self.path(encrypted_name)).parent
-        path.mkdir(parents=True, exist_ok=True)
+        # 创建加密文件
+        encrypted_name = self._get_encrypted_name(name)
+        encrypted_path = self.path(encrypted_name)
         
-        # 保存加密文件
-        with open(self.path(encrypted_name), 'wb') as f:
+        # 确保目录存在
+        os.makedirs(os.path.dirname(encrypted_path), exist_ok=True)
+        
+        # 写入加密文件
+        with open(encrypted_path, 'wb') as f:
             f.write(encrypted_content)
             
         return encrypted_name
-        
+
     def _open(self, name, mode='rb'):
-        """
-        重写打开方法，在读取时解密文件内容
-        """
-        # 读取加密文件
-        with open(self.path(name), 'rb') as f:
+        """打开加密文件"""
+        encrypted_path = self.path(name)
+        if not os.path.exists(encrypted_path):
+            raise FileNotFoundError(f"文件不存在: {name}")
+            
+        with open(encrypted_path, 'rb') as f:
             encrypted_content = f.read()
             
-        # 解密内容
-        decrypted_content = self.fernet.decrypt(encrypted_content)
-        
-        # 创建类文件对象
-        import io
-        return io.BytesIO(decrypted_content)
-
-    def get_available_name(self, name, max_length=None):
-        """
-        重写文件名生成方法，处理加密文件扩展名
-        """
-        if name.endswith('.encrypted'):
-            name = name[:-10]  # 移除.encrypted后缀
-        return super().get_available_name(name, max_length)
+        # 解密文件内容
+        decrypted_content = self.cipher_suite.decrypt(encrypted_content)
+        return decrypted_content
 
     def exists(self, name):
-        """
-        重写文件存在检查方法，考虑加密文件扩展名
-        """
-        if not name.endswith('.encrypted'):
-            name = name + '.encrypted'
-        return super().exists(name)
-
-    def size(self, name):
-        """
-        重写获取文件大小方法
-        """
-        if not name.endswith('.encrypted'):
-            name = name + '.encrypted'
-        return super().size(name)
+        """检查文件是否存在"""
+        encrypted_name = self._get_encrypted_name(name)
+        return super().exists(encrypted_name)
 
     def url(self, name):
-        """
-        重写URL生成方法，移除加密文件扩展名
-        """
-        if name.endswith('.encrypted'):
-            name = name[:-10]
-        return super().url(name) 
+        """生成文件URL"""
+        encrypted_name = self._get_encrypted_name(name)
+        return super().url(encrypted_name)
+
+    def size(self, name):
+        """获取文件大小"""
+        encrypted_name = self._get_encrypted_name(name)
+        return super().size(encrypted_name)
+
+    def delete(self, name):
+        """删除文件"""
+        encrypted_name = self._get_encrypted_name(name)
+        super().delete(encrypted_name) 

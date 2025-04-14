@@ -1,17 +1,23 @@
-from rest_framework import viewsets, mixins, status
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
 from django.core.files.storage import default_storage
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
-from .models import MedicalRecord, MedicationRecord, VaccinationRecord, PhysicalExam, MedicalAttachment
+from .models import (
+    MedicalRecord,
+    MedicationRecord,
+    VaccinationRecord,
+    PhysicalExam,
+    Reminder
+)
 from .serializers import (
     MedicalRecordSerializer,
     MedicationRecordSerializer,
     VaccinationRecordSerializer,
     PhysicalExamSerializer,
-    MedicalAttachmentSerializer
+    ReminderSerializer
 )
 from .permissions import IsOwnerOrStaff
 from rest_framework.parsers import MultiPartParser, FormParser
@@ -31,79 +37,19 @@ def calculate_age(birth_date):
     today = date.today()
     return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
 
-class BaseRecordViewSet(viewsets.ModelViewSet):
-    """所有记录视图集的基类"""
-    permission_classes = [IsAuthenticated]
+class MedicalRecordViewSet(viewsets.ModelViewSet):
+    """就医记录视图集"""
+    queryset = MedicalRecord.objects.all()
+    serializer_class = MedicalRecordSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrStaff]
 
     def get_queryset(self):
         """只返回当前用户的记录"""
         return self.queryset.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        """创建记录时自动关联当前用户"""
+        """创建记录时自动设置用户"""
         serializer.save(user=self.request.user)
-        
-    def perform_update(self, serializer):
-        """更新记录时添加错误处理和日志"""
-        try:
-            serializer.save()
-            logger.info(f"{self.__class__.__name__} 更新成功: {serializer.instance.id}")
-        except Exception as e:
-            logger.error(f"{self.__class__.__name__} 更新失败: {str(e)}")
-            raise
-            
-    def create(self, request, *args, **kwargs):
-        """重写创建方法以提供更好的错误处理"""
-        serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
-            headers = self.get_success_headers(serializer.data)
-            logger.info(f"{self.__class__.__name__} 创建成功")
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        except Exception as e:
-            logger.error(f"{self.__class__.__name__} 创建失败: {str(e)}")
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
-    def update(self, request, *args, **kwargs):
-        """重写更新方法以提供更好的错误处理"""
-        partial = kwargs.pop('partial', False)
-        instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        try:
-            serializer.is_valid(raise_exception=True)
-            self.perform_update(serializer)
-            logger.info(f"{self.__class__.__name__} ID:{instance.id} 更新成功")
-            return Response(serializer.data)
-        except Exception as e:
-            logger.error(f"{self.__class__.__name__} ID:{instance.id} 更新失败: {str(e)}")
-            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-class MedicalRecordViewSet(BaseRecordViewSet):
-    """就医记录视图集"""
-    queryset = MedicalRecord.objects.all()
-    serializer_class = MedicalRecordSerializer
-
-    def get_queryset(self):
-        """获取当前用户的就医记录"""
-        queryset = self.queryset
-        
-        # 筛选条件
-        hospital = self.request.query_params.get('hospital', None)
-        department = self.request.query_params.get('department', None)
-        start_date = self.request.query_params.get('startDate', None)
-        end_date = self.request.query_params.get('endDate', None)
-
-        if hospital:
-            queryset = queryset.filter(hospital__icontains=hospital)
-        if department:
-            queryset = queryset.filter(department=department)
-        if start_date:
-            queryset = queryset.filter(visit_date__gte=start_date)
-        if end_date:
-            queryset = queryset.filter(visit_date__lte=end_date)
-
-        return queryset.order_by('-visit_date')
 
     @action(detail=False, methods=['get'])
     def statistics(self, request):
@@ -115,10 +61,11 @@ class MedicalRecordViewSet(BaseRecordViewSet):
         )
         return Response(stats)
 
-class MedicationRecordViewSet(BaseRecordViewSet):
+class MedicationRecordViewSet(viewsets.ModelViewSet):
     """用药记录视图集"""
     queryset = MedicationRecord.objects.all()
     serializer_class = MedicationRecordSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrStaff]
     
     def get_queryset(self):
         """获取当前用户的用药记录"""
@@ -153,10 +100,11 @@ class MedicationRecordViewSet(BaseRecordViewSet):
             logger.error(f"获取用药统计信息失败: {str(e)}")
             return Response({"detail": "获取统计信息失败"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class VaccinationRecordViewSet(BaseRecordViewSet):
+class VaccinationRecordViewSet(viewsets.ModelViewSet):
     """疫苗接种记录视图集"""
     queryset = VaccinationRecord.objects.all()
     serializer_class = VaccinationRecordSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrStaff]
 
     def get_queryset(self):
         """获取当前用户的疫苗接种记录"""
@@ -184,10 +132,11 @@ class VaccinationRecordViewSet(BaseRecordViewSet):
             logger.error(f"获取疫苗接种统计信息失败: {str(e)}")
             return Response({"detail": "获取统计信息失败"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class PhysicalExamViewSet(BaseRecordViewSet):
+class PhysicalExamViewSet(viewsets.ModelViewSet):
     """体检记录视图集"""
     queryset = PhysicalExam.objects.all()
     serializer_class = PhysicalExamSerializer
+    permission_classes = [permissions.IsAuthenticated, IsOwnerOrStaff]
     parser_classes = (MultiPartParser, FormParser)
 
     def get_queryset(self):
@@ -223,146 +172,6 @@ class PhysicalExamViewSet(BaseRecordViewSet):
         exam = self.get_queryset().last()
         serializer = self.get_serializer(exam)
         return Response(serializer.data)
-        
-    @action(detail=True, methods=['get'])
-    def report(self, request, pk=None):
-        """获取体检报告详情，包含异常项目标记"""
-        exam = self.get_object()
-        
-        # 基本报告数据
-        exam_data = self.get_serializer(exam).data
-        
-        # 添加用户信息
-        user_data = {
-            'user_name': exam.user.get_full_name() or exam.user.username,
-            'gender': getattr(exam.user, 'gender', '未知'),
-            'age': calculate_age(getattr(exam.user, 'birth_date', None)),
-            'exam_id': f"{exam.id:012d}"  # 格式化为12位数字
-        }
-        
-        # 模拟异常项目数据
-        # 实际项目中应该从体检报告解析或诊断系统获取
-        blood_pressure = exam.blood_pressure.split('/')
-        systolic = int(blood_pressure[0]) if len(blood_pressure) > 0 else 0
-        diastolic = int(blood_pressure[1]) if len(blood_pressure) > 1 else 0
-        
-        abnormal_items = []
-        
-        # 血压判断
-        if systolic > 140 or diastolic > 90:
-            abnormal_items.append({
-                'name': '高血压',
-                'severity': 'moderate',
-                'description': f'血压值偏高({exam.blood_pressure} mmHg)，正常范围应小于140/90 mmHg。',
-                'suggestion': '控制饮食，减少盐分摄入，适当运动，心内科随诊。',
-                'position': {'top': 35, 'left': 58}
-            })
-        elif systolic < 90 or diastolic < 60:
-            abnormal_items.append({
-                'name': '低血压',
-                'severity': 'mild',
-                'description': f'血压值偏低({exam.blood_pressure} mmHg)，正常范围应大于90/60 mmHg。',
-                'suggestion': '多补充水分，适量增加盐分摄入，必要时就医。',
-                'position': {'top': 35, 'left': 58}
-            })
-            
-        # BMI判断
-        bmi = exam.calculate_bmi()
-        if bmi and bmi > 28:
-            abnormal_items.append({
-                'name': '肥胖',
-                'severity': 'moderate',
-                'description': f'体重指数(BMI)为{bmi}，属于肥胖。',
-                'suggestion': '控制饮食，增加运动量，营养科随诊。',
-                'position': {'top': 45, 'left': 50}
-            })
-        elif bmi and bmi > 24:
-            abnormal_items.append({
-                'name': '超重',
-                'severity': 'mild',
-                'description': f'体重指数(BMI)为{bmi}，属于超重。',
-                'suggestion': '注意饮食健康，适量运动。',
-                'position': {'top': 45, 'left': 50}
-            })
-        
-        # 血糖判断
-        if hasattr(exam, 'blood_glucose') and exam.blood_glucose:
-            if exam.blood_glucose > 6.1:
-                abnormal_items.append({
-                    'name': '血糖偏高',
-                    'severity': 'moderate',
-                    'description': f'空腹血糖值为{exam.blood_glucose} mmol/L，正常范围为3.9-6.1 mmol/L。',
-                    'suggestion': '控制碳水化合物摄入，内分泌科随诊。',
-                    'position': {'top': 55, 'left': 45}
-                })
-            elif exam.blood_glucose < 3.9:
-                abnormal_items.append({
-                    'name': '血糖偏低',
-                    'severity': 'mild',
-                    'description': f'空腹血糖值为{exam.blood_glucose} mmol/L，正常范围为3.9-6.1 mmol/L。',
-                    'suggestion': '定时进食，避免空腹。',
-                    'position': {'top': 55, 'left': 45}
-                })
-        
-        # 胆固醇判断
-        if hasattr(exam, 'cholesterol') and exam.cholesterol:
-            if exam.cholesterol > 5.2:
-                abnormal_items.append({
-                    'name': '胆固醇偏高',
-                    'severity': 'moderate',
-                    'description': f'总胆固醇值为{exam.cholesterol} mmol/L，正常范围应小于5.2 mmol/L。',
-                    'suggestion': '控制油脂摄入，多食用富含膳食纤维的食物，心内科随诊。',
-                    'position': {'top': 45, 'left': 68}
-                })
-        
-        # 合并结果
-        result = {**exam_data, **user_data, 'abnormal_items': abnormal_items}
-        return Response(result)
-
-class MedicalAttachmentViewSet(BaseRecordViewSet):
-    queryset = MedicalAttachment.objects.all()
-    serializer_class = MedicalAttachmentSerializer
-    parser_classes = (MultiPartParser, FormParser)
-
-    @action(detail=True, methods=['post'])
-    def upload_attachment(self, request, pk=None):
-        """上传附件"""
-        record = self.get_object()
-        file_obj = request.FILES.get('file')
-        
-        if not file_obj:
-            return Response({'error': '没有文件上传'}, status=status.HTTP_400_BAD_REQUEST)
-
-        attachment = MedicalAttachment.objects.create(
-            record=record,
-            name=file_obj.name,
-            file=file_obj,
-            size=file_obj.size
-        )
-
-        serializer = MedicalAttachmentSerializer(attachment)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    @action(detail=True, methods=['delete'])
-    def delete_attachment(self, request, pk=None):
-        """删除附件"""
-        attachment_id = request.query_params.get('attachment_id')
-        if not attachment_id:
-            return Response({'error': '未指定附件ID'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            attachment = MedicalAttachment.objects.get(
-                id=attachment_id,
-                record_id=pk,
-                record__user=request.user
-            )
-            # 删除文件
-            if default_storage.exists(attachment.file.name):
-                default_storage.delete(attachment.file.name)
-            attachment.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except MedicalAttachment.DoesNotExist:
-            return Response({'error': '附件不存在'}, status=status.HTTP_404_NOT_FOUND)
 
 class HealthOverviewAPI(viewsets.ViewSet):
     """健康总览API"""
@@ -373,14 +182,11 @@ class HealthOverviewAPI(viewsets.ViewSet):
         """获取健康记录总览统计"""
         user = request.user
         medical_records = MedicalRecord.objects.filter(user=user)
-        
-        # 修复: 通过medical_record关系获取用户的medication_records
         medication_records = MedicationRecord.objects.filter(medical_record__user=user)
-        
         vaccination_records = VaccinationRecord.objects.filter(user=user)
         physical_exams = PhysicalExam.objects.filter(user=user)
 
-        # 统计数据（不包含模型实例）
+        # 统计数据
         stats = {
             'medical_records': {
                 'total': medical_records.count(),
@@ -392,7 +198,7 @@ class HealthOverviewAPI(viewsets.ViewSet):
             },
             'vaccination_records': {
                 'total': vaccination_records.count(),
-                'pending_next_dose': vaccination_records.filter(next_dose_date__isnull=False).count(),
+                'pending_next_dose': vaccination_records.filter(next_due_date__isnull=False).count(),
             },
             'physical_exams': {
                 'total': physical_exams.count(),
@@ -505,7 +311,7 @@ class HealthOverviewAPI(viewsets.ViewSet):
                     'type': 'vaccination',
                     'date': record.vaccination_date.isoformat() if record.vaccination_date else None,
                     'title': f'疫苗接种',
-                    'description': f'接种{record.vaccine_type_display}疫苗'
+                    'description': f'接种{record.get_vaccine_type_display()}疫苗'
                 })
                 
             for record in physical:
@@ -514,7 +320,7 @@ class HealthOverviewAPI(viewsets.ViewSet):
                     'type': 'physical',
                     'date': record.exam_date.isoformat() if record.exam_date else None,
                     'title': f'体检记录',
-                    'description': f'在{record.hospital}进行体检'
+                    'description': f'在{record.institution}进行体检'
                 })
             
             # 按日期排序，最近的在前

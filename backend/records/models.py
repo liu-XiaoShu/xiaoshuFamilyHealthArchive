@@ -11,8 +11,12 @@ import structlog
 from .storage import EncryptedFileStorage
 from django.conf import settings
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 logger = structlog.get_logger(__name__)
+
+User = get_user_model()
 
 def validate_file_size(file):
     """验证文件大小不超过10MB"""
@@ -85,22 +89,6 @@ class MedicalRecord(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.hospital} - {self.visit_date}"
-
-class MedicalAttachment(models.Model):
-    """就医记录附件"""
-    record = models.ForeignKey(MedicalRecord, on_delete=models.CASCADE, related_name='attachments')
-    name = models.CharField('文件名', max_length=255)
-    file = models.FileField('文件', upload_to='medical_records/')
-    size = models.IntegerField('文件大小')
-    upload_time = models.DateTimeField('上传时间', auto_now_add=True)
-
-    class Meta:
-        verbose_name = '就医记录附件'
-        verbose_name_plural = verbose_name
-        ordering = ['-upload_time']
-
-    def __str__(self):
-        return self.name
 
 class MedicationRecord(models.Model):
     """
@@ -313,4 +301,63 @@ class PhysicalExam(AuditModelMixin, models.Model):
 
     def __str__(self):
         return f"{self.user}的{self.exam_date}体检报告"
+
+class Reminder(models.Model):
+    """提醒记录模型"""
+    RECORD_TYPES = [
+        ('medical', '就医'),
+        ('medication', '用药'),
+        ('vaccination', '疫苗接种'),
+        ('physical_exam', '体检')
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='reminders',
+        verbose_name=_('用户')
+    )
+    title = models.CharField(
+        max_length=100,
+        verbose_name=_('提醒标题')
+    )
+    description = models.TextField(
+        verbose_name=_('提醒描述')
+    )
+    reminder_time = models.DateTimeField(
+        verbose_name=_('提醒时间')
+    )
+    is_completed = models.BooleanField(
+        default=False,
+        verbose_name=_('是否完成')
+    )
+    record_type = models.CharField(
+        max_length=20,
+        choices=RECORD_TYPES,
+        verbose_name=_('记录类型')
+    )
+    record_id = models.PositiveIntegerField(
+        verbose_name=_('关联记录ID')
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('创建时间')
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_('更新时间')
+    )
+
+    class Meta:
+        verbose_name = _('提醒')
+        verbose_name_plural = _('提醒')
+        ordering = ['-reminder_time']
+
+    def __str__(self):
+        return f"{self.title} - {self.user.username}"
+
+    def clean(self):
+        """验证提醒时间"""
+        if self.reminder_time < timezone.now():
+            raise ValidationError(_('提醒时间不能早于当前时间'))
 

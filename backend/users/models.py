@@ -113,6 +113,14 @@ class CustomUser(AbstractUser):
         verbose_name='user permissions',
     )
 
+    avatar = models.ImageField(
+        verbose_name=_('个人头像'),
+        upload_to='avatars/',
+        null=True,
+        blank=True,
+        help_text=_('用户的个人头像，如未上传将使用默认头像')
+    )
+
     class Meta:
         # 后台管理系统显示名称
         verbose_name = _('用户健康档案')
@@ -146,6 +154,46 @@ class CustomUser(AbstractUser):
                 raise ValidationError({'hobbies': _('单个兴趣爱好不能超过20个字符')})
             if len(hobbies_list) > 10:
                 raise ValidationError({'hobbies': _('兴趣爱好不能超过10个')})
+
+    def get_age(self):
+        """计算用户年龄"""
+        if not self.birth_date:
+            return None
+        today = date.today()
+        return today.year - self.birth_date.year - (
+            (today.month, today.day) < (self.birth_date.month, self.birth_date.day)
+        )
+
+    def get_age_group(self):
+        """获取用户年龄段"""
+        age = self.get_age()
+        if age is None:
+            return 'young'  # 默认为青年
+        if age <= 12:
+            return 'child'
+        elif age <= 17:
+            return 'teen'
+        elif age <= 35:
+            return 'young'
+        elif age <= 55:
+            return 'middle'
+        else:
+            return 'elder'
+
+    def get_default_avatar(self):
+        """获取默认头像URL"""
+        if self.avatar:
+            return self.avatar.url
+        
+        try:
+            default_avatar = DefaultAvatar.objects.get(
+                gender=self.gender or 'other',
+                age_group=self.get_age_group()
+            )
+            return default_avatar.avatar.url
+        except DefaultAvatar.DoesNotExist:
+            # 如果没有找到对应的默认头像，返回一个通用默认头像
+            return '/static/images/default_avatar.png'
 
 
 class FamilyRelationship(models.Model):
@@ -305,121 +353,51 @@ class UserProfile(models.Model):
             return [item.strip() for item in self.allergies.split(',')]
         return []
 
-    def get_default_avatar(self):
-        """
-        根据用户的性别和年龄获取相应的默认头像
-        """
-        user = self.user
-        
-        # 如果用户已有头像，直接返回
-        if self.avatar and os.path.exists(self.avatar.path):
-            return self.avatar.url
-            
-        # 确定用户类别
-        gender = user.gender or 'male'  # 默认为男性
-        
-        # 计算年龄
-        age = None
-        if user.birth_date:
-            today = date.today()
-            age = today.year - user.birth_date.year - ((today.month, today.day) < (user.birth_date.month, user.birth_date.day))
-        
-        # 根据年龄和性别确定头像类别
-        category = None
-        if gender.lower() == 'male':
-            if age is not None and age < 20:
-                category = 'male_child'
-            elif age is not None and age >= 50:
-                category = 'male_elder'
-            else:
-                category = 'male_adult'
-        else:  # female or other
-            if age is not None and age < 20:
-                category = 'female_child'
-            elif age is not None and age >= 50:
-                category = 'female_elder'
-            else:
-                category = 'female_adult'
-        
-        # 查找默认头像
-        try:
-            default_avatar = DefaultAvatar.objects.get(category=category)
-            return default_avatar.image.url
-        except DefaultAvatar.DoesNotExist:
-            # 如果找不到特定类别的头像，尝试使用任何可用的默认头像
-            try:
-                default_avatar = DefaultAvatar.objects.first()
-                if default_avatar:
-                    return default_avatar.image.url
-            except:
-                pass
-                
-        return None  # 如果没有默认头像可用
 
 class DefaultAvatar(models.Model):
     """
     默认头像模型
-    根据用户性别和年龄段提供默认头像
+    基于用户年龄段和性别提供默认头像
     """
-    AVATAR_CATEGORIES = [
-        ('male_child', _('男性儿童')),
-        ('female_child', _('女性儿童')),
-        ('male_adult', _('男性成年')),
-        ('female_adult', _('女性成年')),
-        ('male_elder', _('男性老年')),
-        ('female_elder', _('女性老年')),
+    GENDER_CHOICES = [
+        ('male', _('男')),
+        ('female', _('女')),
+        ('other', _('其他'))
     ]
-    
-    # 头像文件名映射
-    AVATAR_FILE_NAMES = {
-        'male_child': 'male_child_avatar.png',
-        'female_child': 'girl_child_avatar.png',
-        'male_adult': 'Male_middle-aged_avatar.png',
-        'female_adult': 'female_middle-aged_avatar.png',
-        'male_elder': 'male_elderly_avatar.png',
-        'female_elder': 'female_elderly_avatar.png',
-    }
-    
-    category = models.CharField(
-        verbose_name=_('头像类别'),
-        max_length=20,
-        choices=AVATAR_CATEGORIES,
-        unique=True,
-        help_text=_('头像适用的用户类别')
+
+    AGE_GROUP_CHOICES = [
+        ('child', _('儿童')),      # 0-12岁
+        ('teen', _('青少年')),     # 13-17岁
+        ('young', _('青年')),      # 18-35岁
+        ('middle', _('中年')),     # 36-55岁
+        ('elder', _('老年'))       # 56岁以上
+    ]
+
+    gender = models.CharField(
+        verbose_name=_('性别'),
+        max_length=10,
+        choices=GENDER_CHOICES,
+        help_text=_('头像对应的性别')
     )
-    
-    image = models.ImageField(
+
+    age_group = models.CharField(
+        verbose_name=_('年龄段'),
+        max_length=10,
+        choices=AGE_GROUP_CHOICES,
+        help_text=_('头像对应的年龄段')
+    )
+
+    avatar = models.ImageField(
+        verbose_name=_('默认头像'),
         upload_to='default_avatars/',
-        verbose_name=_('头像图片'),
-        help_text=_('默认头像图片文件')
+        help_text=_('上传对应性别和年龄段的默认头像图片')
     )
-    
-    description = models.CharField(
-        max_length=100,
-        verbose_name=_('描述'),
-        help_text=_('头像的简要描述'),
-        blank=True
-    )
-    
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name=_('创建时间')
-    )
-    
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name=_('更新时间')
-    )
-    
+
     class Meta:
         verbose_name = _('默认头像')
         verbose_name_plural = _('默认头像')
-        
-    def __str__(self):
-        return f"{self.get_category_display()}"
+        unique_together = ['gender', 'age_group']
 
-    @classmethod
-    def get_avatar_filename(cls, category):
-        """返回指定类别的默认文件名"""
-        return cls.AVATAR_FILE_NAMES.get(category, '')
+    def __str__(self):
+        return f"{self.get_gender_display()}-{self.get_age_group_display()}"
 

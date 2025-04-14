@@ -5,7 +5,7 @@ from .models import (
     MedicationRecord,
     VaccinationRecord,
     PhysicalExam,
-    MedicalAttachment
+    Reminder
 )
 
 @admin.register(MedicalRecord)
@@ -50,18 +50,22 @@ class MedicationRecordAdmin(admin.ModelAdmin):
     )
     list_filter = (
         'frequency',
-        'reminder_enabled'
+        'reminder_enabled',
+        'start_date',
     )
     search_fields = (
         'drug_name',
         'medical_record__diagnosis'
     )
     raw_id_fields = ('medical_record',)
-    # 自定义字段方法
+
     def medical_record_link(self, obj):
         """创建医疗记录管理链接"""
-        url = f'/admin/records/medicalrecord/{obj.medical_record.id}/change/'
-        return f'<a href="{url}">{obj.medical_record.truncated_diagnosis}</a>'
+        if obj.medical_record:
+            url = f'/admin/records/medicalrecord/{obj.medical_record.id}/change/'
+            diagnosis = obj.medical_record.diagnosis[:50] + '...' if len(obj.medical_record.diagnosis) > 50 else obj.medical_record.diagnosis
+            return f'<a href="{url}">{diagnosis}</a>'
+        return '-'
     medical_record_link.short_description = _('关联记录')
     medical_record_link.allow_tags = True
 
@@ -74,7 +78,7 @@ class MedicationRecordAdmin(admin.ModelAdmin):
 
     def reminder_status(self, obj):
         """显示提醒状态"""
-        if obj.reminder_enabled:
+        if obj.reminder_enabled and obj.reminder_time:
             return f'每日 {obj.reminder_time.strftime("%H:%M")}'
         return '未启用'
     reminder_status.short_description = _('提醒状态')
@@ -163,13 +167,26 @@ class PhysicalExamAdmin(admin.ModelAdmin):
     report_link.short_description = _('体检报告')
     report_link.allow_tags = True
 
-@admin.register(MedicalAttachment)
-class MedicalAttachmentAdmin(admin.ModelAdmin):
-    """就医记录附件管理"""
-    list_display = ['id', 'record', 'name', 'size', 'upload_time']
-    list_filter = ['upload_time']
-    search_fields = ['name']
-    readonly_fields = ['size', 'upload_time']
+@admin.register(Reminder)
+class ReminderAdmin(admin.ModelAdmin):
+    """提醒记录管理"""
+    list_display = (
+        'user',
+        'title',
+        'reminder_time',
+        'is_completed',
+        'record_type'
+    )
+    list_filter = (
+        'record_type',
+        'is_completed'
+    )
+    search_fields = (
+        'user__username',
+        'title',
+        'description'
+    )
+    date_hierarchy = 'reminder_time'
 
 # 可选：添加全局管理配置
 admin.site.site_header = _('健康档案管理系统')

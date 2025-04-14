@@ -1,7 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.translation import gettext_lazy as _
-from .models import CustomUser, FamilyRelationship
+from .models import CustomUser, FamilyRelationship, DefaultAvatar
+from django.utils.html import format_html
 
 @admin.register(CustomUser)
 class CustomUserAdmin(UserAdmin):
@@ -127,4 +128,18 @@ class FamilyRelationshipAdmin(admin.ModelAdmin):
             messages.error(request, _('不能创建用户与自身的关系'))
             return
         super().save_model(request, obj, form, change)
+
+@admin.register(DefaultAvatar)
+class DefaultAvatarAdmin(admin.ModelAdmin):
+    """默认头像管理配置"""
+    list_display = ('gender', 'age_group', 'avatar_preview')
+    list_filter = ('gender', 'age_group')
+    search_fields = ('gender', 'age_group')
+    
+    def avatar_preview(self, obj):
+        """在列表中显示头像预览"""
+        if obj.avatar:
+            return format_html('<img src="{}" width="50" height="50" />', obj.avatar.url)
+        return "无头像"
+    avatar_preview.short_description = '头像预览'
 
