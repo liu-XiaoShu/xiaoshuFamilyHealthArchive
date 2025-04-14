@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="health-pattern" x="0" y="0" width="50" height="50" patternUnits="userSpaceOnUse">
+      <!-- 十字形（医疗符号） -->
+      <path d="M22 15h6v7h7v6h-7v7h-6v-7h-7v-6h7v-7z" fill="#1890ff" opacity="0.1"/>
+      
+      <!-- 心形 -->
+      <path d="M45 20c-2-2-5-2-7 0l-1 1-1-1c-2-2-5-2-7 0s-2 5 0 7l8 8 8-8c2-2 2-5 0-7z" fill="#1890ff" opacity="0.1"/>
+      
+      <!-- 圆点 -->
+      <circle cx="10" cy="10" r="2" fill="#1890ff" opacity="0.1"/>
+      <circle cx="40" cy="40" r="2" fill="#1890ff" opacity="0.1"/>
+    </pattern>
+  </defs>
+  
+  <!-- 使用图案填充整个SVG -->
+  <rect width="100" height="100" fill="url(#health-pattern)"/>
+</svg> 

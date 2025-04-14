@@ -1,0 +1,214 @@
+@import './base.css';
+
+/* 全局样式变量 */
+:root {
+  --primary-color: #409EFF;
+  --success-color: #67c23a;
+  --warning-color: #e6a23c;
+  --danger-color: #f56c6c;
+  --info-color: #909399;
+  --background-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  --card-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  --transition-duration: 0.3s;
+}
+
+/* 全局基础样式 */
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--background-gradient);
+}
+
+#app {
+  height: 100%;
+}
+
+/* 全局过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-duration) ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 卡片样式 */
+.app-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+  transition: all var(--transition-duration);
+}
+
+.app-card:hover {
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.2);
+}
+
+/* 表单样式 */
+.app-form {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-actions {
+  margin-top: 20px;
+  text-align: right;
+}
+
+/* 数据加载动画 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+/* 响应式布局 */
+@media screen and (max-width: 768px) {
+  .app-card {
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .form-actions {
+    margin-top: 15px;
+  }
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f7fa;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c4cc;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #909399;
+}
+
+/* 表格样式 */
+.app-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.app-table th,
+.app-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.app-table th {
+  background-color: #f5f7fa;
+  color: #606266;
+  font-weight: 500;
+}
+
+.app-table tr:hover td {
+  background-color: #f5f7fa;
+}
+
+/* 状态标签样式 */
+.status-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.status-tag.normal {
+  background-color: #f0f9eb;
+  color: var(--success-color);
+}
+
+.status-tag.warning {
+  background-color: #fdf6ec;
+  color: var(--warning-color);
+}
+
+.status-tag.danger {
+  background-color: #fef0f0;
+  color: var(--danger-color);
+}
+
+/* 按钮组样式 */
+.button-group {
+  display: flex;
+  gap: 10px;
+}
+
+/* 图表容器样式 */
+.chart-container {
+  height: 400px;
+  margin: 20px 0;
+}
+
+/* 文件上传区域样式 */
+.upload-area {
+  border: 2px dashed #dcdfe6;
+  border-radius: 6px;
+  padding: 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition-duration);
+}
+
+.upload-area:hover {
+  border-color: var(--primary-color);
+}
+
+/* 头像样式 */
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 标题样式 */
+.page-title {
+  font-size: 24px;
+  color: #303133;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: 18px;
+  color: #606266;
+  margin: 15px 0;
+  font-weight: 500;
+}
+
+/* 提示文本样式 */
+.hint-text {
+  color: #909399;
+  font-size: 14px;
+  margin: 5px 0;
+}
+
+/* 错误文本样式 */
+.error-text {
+  color: var(--danger-color);
+  font-size: 14px;
+  margin: 5px 0;
+}
