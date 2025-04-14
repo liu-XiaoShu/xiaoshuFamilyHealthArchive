@@ -405,7 +405,7 @@ class DefaultAvatarViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         """根据不同操作设置不同权限"""
-        if self.action in ['list', 'retrieve']:
+        if self.action in ['list', 'retrieve', 'by_category', 'get_by_age_gender']:
             # 允许已认证用户查看默认头像
             permission_classes = [IsAuthenticated]
         else:
@@ -486,4 +486,61 @@ class DefaultAvatarViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': f'未找到类别为{category}的默认头像'
             }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'])
+    def get_by_age_gender(self, request):
+        """根据用户年龄和性别获取合适的默认头像"""
+        age = request.query_params.get('age')
+        gender = request.query_params.get('gender', 'unknown').lower()
+        
+        # 确定年龄组
+        age_group = 'adult'  # 默认成人
+        if age:
+            try:
+                age_val = int(age)
+                if age_val < 12:
+                    age_group = 'child'
+                elif age_val >= 50:
+                    age_group = 'elder'
+            except (ValueError, TypeError):
+                pass
+        
+        # 确保性别参数合法
+        if gender not in ['male', 'female', 'other', 'unknown']:
+            gender = 'unknown'
+        
+        # 如果是"other"，对应到"unknown"类别
+        if gender == 'other':
+            gender = 'unknown'
+        
+        # 确定头像类别
+        category = f"{gender}_{age_group}"
+        
+        try:
+            # 尝试获取匹配的头像
+            avatar = DefaultAvatar.objects.filter(category=category).first()
+            
+            # 如果没找到特定类别的头像，尝试找同性别任意年龄组的头像
+            if not avatar:
+                avatar = DefaultAvatar.objects.filter(category__startswith=f"{gender}_").first()
+            
+            # 如果还是没找到，返回任意默认头像
+            if not avatar:
+                avatar = DefaultAvatar.objects.first()
+                
+            if avatar:
+                return Response({
+                    'image_url': request.build_absolute_uri(avatar.image.url),
+                    'category': avatar.category,
+                    'description': avatar.description
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    'error': '系统中没有默认头像可用'
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            return Response({
+                'error': f'获取默认头像失败: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

@@ -1,0 +1,22 @@
+你好，我有一个项目，是家庭健康档案系统，介绍如下
+
+1、一个开源项目，主要用于家庭成员的健康数据管理，最适合部署在家庭NAS 或者服务器中
+2、当前这个项目前端和后端，均完成90%，但是有一些问题和细节需要你帮我处理和实现
+
+你需要帮我的如下
+
+1、前端注册一个用户后，在首页和个人资料页均要显示默认头像，当然用户在个人资料更新后，显示用户更新后的头像，当前情况没实现
+  默认头像显示策略,如下:
+		1、当注册用户的年龄计算小于等于 15岁, 性别为男性：使用 backend/media/default_avatars/male_child_default_avatar.png 这个默认头像
+		2、当注册用户的年龄计算小于等于 15岁, 性别为女性：使用 backend/media/default_avatars/girl_child_default_avatar.png 这个默认头像
+		3、当注册用户的年龄计算介于 15岁到 50岁之间, 性别为男性：使用 backend/media/default_avatars/Male_middle-aged_default_avatar.png 这个默认头像
+		4、当注册用户的年龄计算介于 15岁到 50岁之间, 性别为女性：使用 backend/media/default_avatars/female_middle-aged_default_avatar.png 这个默认头像
+		5、当注册用户的年龄计算大于等于 50岁, 性别为男性：使用 backend/media/default_avatars/male_elderly_default_avatar.png 这个默认头像
+		6、当注册用户的年龄计算大于等于 50岁, 性别为女性：使用 backend/media/default_avatars/female_elderly_default_avatar.png 这个默认头像
+2、当前就医记录、用药记录、疫苗记录、个人资料，我可以编辑，但是保存提交均是失败，而且不显示提交或后端后台编辑的内容
+3、首页显示的个人信息，还可以增加，身高、体重、血型等基础信息
+4、右侧的提示，用药提示、就医提示、体检提示，均没有正常获取数据库的内容
+
+
+你先帮我解决上述内容吧
+

@@ -238,7 +238,7 @@ import { ElMessage } from 'element-plus'
 import { User, Message, Phone, Lock } from '@element-plus/icons-vue'
 import type { RegisterData } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
-import { authApi } from '@/api/auth'
+import { register } from '@/api/auth'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -305,7 +305,7 @@ const handleRegister = async () => {
     // 将confirmPassword的值同步到password_confirm
     registerData.password_confirm = registerData.confirmPassword || registerData.password;
     
-    const response = await authApi.register({
+    const response = await register({
       username: registerData.username,
       email: registerData.email,
       phone: registerData.phone,

@@ -313,9 +313,23 @@ const initFormData = async () => {
       form.allergies = healthInfo.allergies?.length ? healthInfo.allergies : ['']
       form.notes = healthInfo.notes || ''
     }
+
+    // 如果用户没有头像，根据年龄和性别获取默认头像
+    if (!profile?.avatar) {
+      await getDefaultAvatar()
+    }
   } catch (error) {
     console.error('加载用户信息失败:', error)
     ElMessage.error('加载用户信息失败')
+  }
+}
+
+const getDefaultAvatar = async () => {
+  try {
+    const response = await userApi.getDefaultAvatarByAgeGender(userInfo.value.age, userInfo.value.gender)
+    userInfo.value.avatar = response.avatar_url
+  } catch (error) {
+    console.error('获取默认头像失败:', error)
   }
 }
 

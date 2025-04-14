@@ -6,6 +6,8 @@ import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+import axios from 'axios'
+import { getToken } from './utils/auth'
 
 import App from './App.vue'
 import router from './router'
@@ -39,11 +41,46 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
   app.component(key, component)
 }
 
+// 配置axios
+axios.defaults.baseURL = import.meta.env.VITE_API_BASE_URL || ''
+// 添加请求拦截器
+axios.interceptors.request.use(
+  config => {
+    const token = getToken()
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+    }
+    return config
+  },
+  error => {
+    return Promise.reject(error)
+  }
+)
+
+// 添加响应拦截器，处理常见错误
+axios.interceptors.response.use(
+  response => {
+    return response
+  },
+  error => {
+    console.error('请求错误:', error)
+    if (error.response) {
+      if (error.response.status === 401) {
+        // 未授权，可能是token过期
+        console.log('未授权，重定向到登录页')
+        router.push('/login')
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 // 使用插件
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, {
-  locale: zhCn
+  locale: zhCn,
+  size: 'default'
 })
 
 // 初始化认证状态
@@ -52,9 +89,8 @@ authStore.initializeAuth()
 
 // 添加错误处理
 app.config.errorHandler = (err, vm, info) => {
-  console.error('Vue错误:', err)
+  console.error('Vue 全局错误:', err)
   console.error('错误信息:', info)
-  console.error('组件:', vm)
 }
 
 // 添加警告处理

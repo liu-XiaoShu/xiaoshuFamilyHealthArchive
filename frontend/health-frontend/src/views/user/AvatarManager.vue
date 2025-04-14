@@ -1,79 +1,48 @@
 <!-- 头像管理界面 -->
 <template>
   <div class="avatar-manager">
-    <h1>头像管理</h1>
+    <h2>头像管理</h2>
     
-    <el-row :gutter="20">
-      <el-col :span="12">
-        <div class="current-avatar">
-          <h2>当前头像</h2>
-          <div class="avatar-display">
-            <el-avatar :size="120" :src="currentAvatar" />
-          </div>
-          <p>用户名: {{ userInfo?.username }}</p>
-          <p>性别: {{ userInfo?.gender || '未知' }}</p>
-          <p>年龄: {{ userAge }} 岁</p>
-        </div>
-        
-        <el-upload
-          class="avatar-upload"
-          action="#"
-          :auto-upload="false"
-          :show-file-list="false"
-          :on-change="handleAvatarChange"
-          accept="image/*"
-        >
-          <el-button type="primary">上传新头像</el-button>
-        </el-upload>
-      </el-col>
+    <div class="avatar-options">
+      <div class="current-avatar">
+        <h3>当前头像</h3>
+        <img :src="currentAvatar || defaultAvatarUrl" alt="当前头像" class="avatar-preview" />
+      </div>
       
-      <el-col :span="12">
-        <div class="default-avatars">
-          <h2>默认头像</h2>
-          <el-tabs v-model="activeTab">
-            <el-tab-pane label="儿童" name="child">
-              <div class="avatar-list">
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="maleChildAvatar" @click="selectDefaultAvatar('male_child')" />
-                  <p>男孩</p>
-                </div>
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="femaleChildAvatar" @click="selectDefaultAvatar('female_child')" />
-                  <p>女孩</p>
-                </div>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="成年" name="adult">
-              <div class="avatar-list">
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="maleAdultAvatar" @click="selectDefaultAvatar('male_adult')" />
-                  <p>成年男性</p>
-                </div>
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="femaleAdultAvatar" @click="selectDefaultAvatar('female_adult')" />
-                  <p>成年女性</p>
-                </div>
-              </div>
-            </el-tab-pane>
-            <el-tab-pane label="老年" name="elder">
-              <div class="avatar-list">
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="maleElderAvatar" @click="selectDefaultAvatar('male_elder')" />
-                  <p>老年男性</p>
-                </div>
-                <div class="avatar-item">
-                  <el-avatar :size="100" :src="femaleElderAvatar" @click="selectDefaultAvatar('female_elder')" />
-                  <p>老年女性</p>
-                </div>
-              </div>
-            </el-tab-pane>
-          </el-tabs>
+      <div class="upload-avatar">
+        <h3>上传新头像</h3>
+        <el-upload
+          class="avatar-uploader"
+          :action="uploadUrl"
+          :headers="headers"
+          :show-file-list="false"
+          :on-success="handleAvatarSuccess"
+          :before-upload="beforeAvatarUpload">
+          <img v-if="imageUrl" :src="imageUrl" class="avatar-preview" />
+          <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+        </el-upload>
+      </div>
+      
+      <div class="default-avatars">
+        <h3>选择默认头像</h3>
+        <div class="default-avatar-grid" v-loading="loadingDefaultAvatars">
+          <div 
+            v-for="avatar in defaultAvatars" 
+            :key="avatar.id" 
+            class="default-avatar-item"
+            @click="selectDefaultAvatar(avatar)">
+            <img :src="avatar.avatar" alt="默认头像" class="avatar-preview" />
+            <div class="avatar-info">
+              <span>{{ getGenderText(avatar.gender) }}</span>
+              <span>{{ getAgeGroupText(avatar.age_group) }}</span>
+            </div>
+          </div>
         </div>
-      </el-col>
-    </el-row>
+      </div>
+    </div>
     
-    <div class="action-buttons">
-      <el-button type="primary" @click="saveAvatar" :loading="uploading">保存头像</el-button>
+    <div class="avatar-actions">
+      <el-button type="primary" @click="saveAvatar">保存更改</el-button>
       <el-button @click="cancelChanges">取消</el-button>
     </div>
   </div>
@@ -86,6 +55,7 @@ import type { UploadFile } from 'element-plus/es/components/upload/src/upload'
 import { useAuthStore } from '@/stores/auth'
 import { userApi } from '@/api/user'
 import type { User } from '@/types/auth'
+import { Plus } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
 const userInfo = computed(() => authStore.user as User)
@@ -230,6 +200,110 @@ onMounted(async () => {
   await loadCurrentAvatar()
   await loadDefaultAvatars()
 })
+
+const imageUrl = ref('')
+const selectedDefaultAvatar = ref(null)
+const defaultAvatars = ref([])
+const loadingDefaultAvatars = ref(false)
+const defaultAvatarUrl = ref('')
+
+const uploadUrl = `${import.meta.env.VITE_API_BASE_URL}/api/users/avatar/`
+const headers = {
+  Authorization: `Bearer ${getToken()}`
+}
+
+const fetchUserProfile = async () => {
+  try {
+    const profile = await getUserProfile()
+    currentAvatar.value = profile.avatar
+  } catch (error) {
+    ElMessage.error('获取用户资料失败')
+    console.error(error)
+  }
+}
+
+const fetchDefaultAvatars = async () => {
+  loadingDefaultAvatars.value = true
+  try {
+    const avatars = await getDefaultAvatars()
+    defaultAvatars.value = avatars
+    
+    // 获取当前用户的年龄和性别来获取默认头像
+    const profile = await getUserProfile()
+    if (profile.birth_date && profile.gender) {
+      const birthDate = new Date(profile.birth_date)
+      const today = new Date()
+      const age = today.getFullYear() - birthDate.getFullYear()
+      
+      // 查找合适的默认头像
+      const suitableAvatar = avatars.find(avatar => {
+        if (avatar.gender === profile.gender) {
+          if ((avatar.age_group === 'child' && age < 18) ||
+              (avatar.age_group === 'adult' && age >= 18 && age < 65) ||
+              (avatar.age_group === 'elderly' && age >= 65)) {
+            return true
+          }
+        }
+        return false
+      })
+      
+      if (suitableAvatar) {
+        defaultAvatarUrl.value = suitableAvatar.avatar
+      }
+    }
+  } catch (error) {
+    ElMessage.error('获取默认头像失败')
+    console.error(error)
+  } finally {
+    loadingDefaultAvatars.value = false
+  }
+}
+
+const handleAvatarSuccess = (response) => {
+  imageUrl.value = response.avatar
+  selectedDefaultAvatar.value = null
+}
+
+const beforeAvatarUpload = (file) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt2M = file.size / 1024 / 1024 < 2
+  
+  if (!isImage) {
+    ElMessage.error('上传头像图片只能是图片格式!')
+    return false
+  }
+  
+  if (!isLt2M) {
+    ElMessage.error('上传头像图片大小不能超过 2MB!')
+    return false
+  }
+  
+  return true
+}
+
+const getGenderText = (gender) => {
+  switch (gender) {
+    case 'M':
+      return '男性'
+    case 'F':
+      return '女性'
+    default:
+      return '其他'
+  }
+}
+
+const getAgeGroupText = (ageGroup) => {
+  switch (ageGroup) {
+    case 'child':
+      return '儿童'
+    case 'adult':
+      return '成人'
+    case 'elderly':
+      return '老年'
+    default:
+      return '未知'
+  }
+}
 </script>
 
 <style scoped>
@@ -237,45 +311,76 @@ onMounted(async () => {
   padding: 20px;
 }
 
-.current-avatar, .default-avatars {
-  background-color: #f7f8fa;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  min-height: 300px;
-}
-
-.avatar-display {
-  margin: 20px 0;
-  display: flex;
-  justify-content: center;
-}
-
-.avatar-upload {
-  margin-top: 20px;
-  text-align: center;
-}
-
-.avatar-list {
+.avatar-options {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: 20px;
-  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
-.avatar-item {
+.current-avatar,
+.upload-avatar,
+.default-avatars {
+  flex: 1;
+  min-width: 250px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.avatar-preview {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin: 0 auto;
+}
+
+.avatar-uploader {
   text-align: center;
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 100px;
+  height: 100px;
+  line-height: 100px;
+  text-align: center;
+  border: 1px dashed #d9d9d9;
+  border-radius: 50%;
   cursor: pointer;
+}
+
+.default-avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.default-avatar-item {
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 4px;
   transition: all 0.3s;
+  text-align: center;
 }
 
-.avatar-item:hover {
-  transform: scale(1.05);
+.default-avatar-item:hover {
+  background-color: #e6f7ff;
 }
 
-.action-buttons {
-  margin-top: 20px;
+.avatar-info {
+  margin-top: 5px;
+  font-size: 12px;
+  color: #606266;
+  display: flex;
+  flex-direction: column;
+}
+
+.avatar-actions {
   text-align: center;
 }
 </style> 
