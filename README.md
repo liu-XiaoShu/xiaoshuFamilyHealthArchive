@@ -1,110 +1,264 @@
-# HomeHealth
-家庭健康档案系统
+# Family Health Archive（家庭健康档案系统）
 
-# 小树家庭健康档案系统
+> **数据留在自家网络，服务全家健康管理**
 
-小树家庭健康档案系统是一个全面的健康记录管理平台，帮助家庭成员记录和管理各种健康信息。
+体检与门诊化验报告常分散在纸质单据、各医院 App 和公司平台中，家庭成员若想**结构化留存、跨年对比趋势、照护老人全貌**，往往要反复翻找。  
+本系统将数据存储在**服务端本地 SQLite**，通过浏览器在**家庭或可信任局域网**内访问，适合「数据不出自己家网络」的自我管理场景。
 
-## 主要功能
+⚠️ **免责声明**：本软件不提供医疗诊断与建议，仅用于信息整理与个人备忘；请以医疗机构意见为准。
 
-- 用户管理与认证
-- 家庭成员关系管理
-- 健康记录管理（就医记录、药物记录、疫苗接种记录、体检记录）
-- 健康数据统计与分析
-- 文件加密存储
-- 提醒与通知
+---
+
+## 📑 目录
+
+- [功能概览](#功能概览)
+- [产品截图](#产品截图)
+- [技术栈](#技术栈)
+- [快速启动](#快速启动)
+- [账号与口令](#账号与口令)
+- [测试](#测试)
+- [局域网部署](#局域网部署)
+- [更多文档](#更多文档)
+
+---
+
+## 功能概览
+
+| 模块       | 说明                                                  |
+| ---------- | ----------------------------------------------------- |
+| 会话与登录 | 单管理员会话（Cookie：`fh_session`）；业务 API 需登录 |
+| 家庭成员   | 档案、血型/身高体重等可由报告回填、头像上传           |
+| 报告批次   | 按一次体检批次归组；明细挂在批次下                    |
+| 指标编辑   | 树形指标（分组 + 叶子细项）；器官库与自选器官         |
+| 录入与明细 | 按人、按批次、按器官/类型/时间多视图                  |
+| 趋势图     | Chart.js 时间序列与标注插件                           |
+| 导入导出   | CSV 模板导出与批量导入；UTF-8（建议 BOM）             |
+
+完整需求口径详见：  
+👉 [docs/需求文档.md](./docs/需求文档.md)
+
+---
+
+## 产品截图
+
+### 1. 首页
+
+![home_page](docs/assets/readme/home_page.png)
+
+### 2. 个人健康档案页面
+
+![UserHealthProfilePage](docs/assets/readme/UserHealthProfilePage.png)
+
+### 3. 用户档案详情页
+
+![UserHealthProfileDetailsPage](docs/assets/readme/UserHealthProfileDetailsPage.png)
+
+### 4. 历年记录与曲线页面
+
+![TrendTable](docs/assets/readme/TrendTable.png)
+
+---
 
 ## 技术栈
 
-### 后端
-- Django
-- Django REST Framework
-- PostgreSQL
-- JWT认证
-- Cryptography (文件加密)
+| 层级       | 技术                                                     |
+| ---------- | -------------------------------------------------------- |
+| 前端       | Vue 3.x · TypeScript · Vite 6.x · vue-router 4.x · axios |
+| 图表       | Chart.js 4.x · date-fns · chartjs-plugin-annotation      |
+| 后端       | FastAPI ≥0.115 · Starlette Session · uvicorn             |
+| ORM / 校验 | SQLAlchemy 2.x · Pydantic v2                             |
+| 安全       | bcrypt · itsdangerous                                    |
+| 存储       | SQLite（默认 `backend/data/family_health.db`）           |
 
-### 前端
-- Vue 3
-- TypeScript
-- Element Plus
-- Pinia
-- Axios
-- Echarts
+- **前端版本**：以 [`frontend/package.json`](./frontend/package.json) 中 `version` 为准（当前 `0.1.0`）
+- **关于对话框版本**：与 [`frontend/src/components/AboutDialog.vue`](./frontend/src/components/AboutDialog.vue) 中 `APP_VERSION` 对齐（当前 `v1.0.0`）
+- **Python**：建议 3.8+
 
-## 设置与启动
+---
 
-### 后端设置
+## 快速启动
 
-1. 创建虚拟环境并安装依赖:
-```bash
+### ✅ 环境要求
+
+| 组件    | 说明                                                    |
+| ------- | ------------------------------------------------------- |
+| Python  | 3.8+                                                    |
+| Node.js | 建议当前 LTS（用于前端构建与开发）                      |
+| 系统    | Linux / macOS 可直接使用一键脚本；Windows 建议使用 WSL2 |
+
+---
+
+### 1️⃣ 获取代码
+
+```shell
+git clone git@github.com:liu-XiaoShu/xiaoshuFamilyHealthArchive.git
+cd xiaoshuFamilyHealthArchive
+```
+
+
+
+---
+
+### 2️⃣ 安装依赖（首次执行）
+
+**后端（推荐虚拟环境）**
+
+```shell
 cd backend
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# 或 venv\Scripts\activate  # Windows
-pip install -r requirements.txt
-```
+python3 -m venv .venv
+./.venv/bin/pip install -r requirements.txt
+cd ..
 
-2. 设置数据库:
-```bash
-python manage.py migrate
-```
+**前端**
 
-3. 创建超级用户:
-```bash
-python manage.py createsuperuser
-```
-
-4. 初始化默认头像:
-```bash
-python manage.py initialize_default_avatars
-```
-
-5. 启动开发服务器:
-```bash
-python manage.py runserver
-```
-
-### 前端设置
-
-1. 安装依赖:
-```bash
-cd frontend/health-frontend
+bash
+cd frontend
 npm install
+cd ..
 ```
 
-2. 启动开发服务器:
-```bash
+
+
+---
+
+### 3️⃣ 启动方式
+
+#### ✅ 方式一：一键开发脚本（推荐）
+
+在项目根目录执行：
+
+```shell
+chmod +x scripts/start-dev.sh
+export PYTHON_BIN="$(pwd)/backend/.venv/bin/python"
+./scripts/start-dev.sh
+```
+
+如需重置管理员口令：
+
+```shell
+./scripts/start-dev.sh --reset-admin-password
+```
+
+**访问地址**
+
+| 服务         | 地址                                           |
+| ------------ | ---------------------------------------------- |
+| 前端         | http://127.0.0.1:5173                          |
+| 后端健康检查 | http://127.0.0.1:8000/api/health               |
+| API          | 开发模式下 `/api` 由 Vite 代理至后端 8000 端口 |
+
+---
+
+#### ✅ 方式二：手动双终端启动
+
+**后端**
+
+```shell
+cd backend
+./.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+**前端**
+
+```shell
+cd frontend
 npm run dev
 ```
 
-## 默认头像功能
+浏览器访问：http://127.0.0.1:5173
 
-系统提供根据用户性别和年龄自动分配默认头像的功能:
+---
 
-### 默认头像类别
+### 4️⃣ 首次登录
 
-系统根据不同的用户特征提供不同的默认头像：
+当数据库为空时，将根据环境变量自动创建首个管理员：
 
-1. 性别分组: 男性、女性、未知
-2. 年龄分组: 儿童（12岁以下）、成人（12-49岁）、长者（50岁及以上）
+| 环境变量            | 默认值                              |
+| ------------------- | ----------------------------------- |
+| `FH_ADMIN_USERNAME` | admin                               |
+| `FH_ADMIN_PASSWORD` | family-health                       |
+| `FH_SESSION_SECRET` | （内置占位，生产请自行设置 ≥16 位） |
 
-### 管理默认头像
+建议在 `backend/.env` 中配置（参考 [`backend/app/settings.py`](./backend/app/settings.py)）。
 
-管理员可以通过以下方式管理默认头像:
+---
 
-1. 使用Django管理界面: `/admin/users/defaultavatar/`
-2. 使用命令行初始化/更新默认头像:
-   ```bash
-   python manage.py initialize_default_avatars  # 初始化
-   python manage.py initialize_default_avatars --force  # 强制更新所有
-   ```
+## 账号与口令
 
-3. 通过API:
-   - 获取所有默认头像: `GET /api/users/default-avatars/`
-   - 获取特定类别头像: `GET /api/users/default-avatars/by_category/?category=male_adult`
-   - 根据年龄和性别获取头像: `GET /api/users/default-avatars/get_by_age_gender/?age=25&gender=male`
+### 修改用户名
 
-默认头像文件应存放在 `backend/static/default_avatars/` 目录，命名格式遵循 `{gender}_{age_group}.png` 格式，如：
-- `male_child.png`
-- `female_adult.png`
-- `unknown_elder.png`
+登录后点击顶部用户名旁的 **「改名」**
+
+### 修改登录口令
+
+可使用开发脚本：
+
+```shell
+./scripts/start-dev.sh --reset-admin-password
+```
+
+⚠️ 生产环境操作前请备份 `family_health.db`
+
+---
+
+## 测试
+
+### 后端会话与安全冒烟测试
+
+```shell
+cd backend
+pip install -r requirements-dev.txt
+./scripts/run-security-tests.sh -v
+```
+
+等价手动命令：
+
+```shell
+
+cd backend
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. \
+python3 -m pytest tests/test_security.py -v
+```
+
+
+
+### 前端构建检查
+
+```shell
+cd frontend
+npm run build
+```
+
+
+
+---
+
+## 局域网部署
+
+推荐 **前后端同源部署**，便于 Cookie 与文件上传（如 CSV）：
+
+```shell
+cd frontend && npm run build
+cd ../backend
+./.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+局域网访问：
+
+```shell
+http://<服务器局域网IP>:8000
+
+数据库文件位置：
+
+backend/data/family_health.db
+```
+
+
+
+---
+
+## 更多文档
+
+- 📄 [需求规格说明（结构化归档）](./docs/需求文档.md)
+
+---
