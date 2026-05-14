@@ -111,7 +111,7 @@ python3 -m venv .venv
 cd ..
 ```
 
-**前端
+**前端**
 
 ```shell
 cd frontend
