@@ -18,6 +18,7 @@
 - [账号与口令](#账号与口令)
 - [测试](#测试)
 - [局域网部署](#局域网部署)
+- [开源许可](#开源许可)
 - [更多文档](#更多文档)
 
 ---
@@ -108,10 +109,11 @@ cd backend
 python3 -m venv .venv
 ./.venv/bin/pip install -r requirements.txt
 cd ..
+```
 
-**前端**
+**前端
 
-bash
+```shell
 cd frontend
 npm install
 cd ..
@@ -254,6 +256,15 @@ backend/data/family_health.db
 ```
 
 
+
+---
+
+## 开源许可
+
+本仓库代码与文档的著作权归 **liu-XiaoShu**，采用仓库内自定义许可条款：**个人/非商业使用须注明作者及来源**；**商业化或面向公众的有偿服务须事先取得著作权人授权**。完整文本见：
+
+- [LICENSE](./LICENSE)（中文）
+- [LICENSE-en](./LICENSE-en)（English）
 
 ---
 

@@ -1,0 +1,56 @@
+Family Health Archive Software License Agreement
+================================================
+
+Copyright © 2026 liu-XiaoShu. All rights reserved.
+
+Subject to compliance with the following terms, the copyright holder grants you the rights set forth in this License.
+
+────────────────────────────────
+I. Personal use
+────────────────────────────────
+
+1. You may download, install, and run this software for private purposes, such as personal or household use, provided your use is non-commercial.
+
+2. Whenever you use, display, or redistribute this software or a copy thereof (including in binary, source, or browsable form), you must reasonably **credit the original author and identify the source**, for example:
+   · the name of the software and a link to this repository or the distribution page (if any); and
+   · the name of the copyright holder, **liu-XiaoShu**, or the copyright notice at the beginning of this License file.
+
+────────────────────────────────
+II. No unauthorized commercial use
+────────────────────────────────
+
+Without the copyright holder’s prior express consent (in writing or by direct message as agreed), you may not use this software or any derivative work for profit, or for commercial operations aimed at the general public—such as paid hosting, training for profit, resale or sublicensing, or similar commercial exploitation.  
+If you wish to commercialize or charge for services, contact the copyright holder first and obtain permission.
+
+────────────────────────────────
+III. Modifications and derivative works by individual developers
+────────────────────────────────
+
+1. Individual developers may study or modify the source code of this software and create derivative works for personal or non-commercial purposes.
+
+2. If you publish, share, or redistribute a modified version or any derivative work, you must **preserve and state the original author and the source of this project**, including the copyright notice in this License; and you should clearly describe your changes (for example, briefly in a README or in code comments).
+
+3. Derivative works are likewise subject to the **non-commercial** and **attribution** conditions: you may not use them commercially without written authorization, and attribution requirements continue to apply.
+
+────────────────────────────────
+IV. Disclaimer of warranty
+────────────────────────────────
+
+THE SOFTWARE IS PROVIDED “AS IS,” WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.  
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE COPYRIGHT HOLDER SHALL NOT BE LIABLE FOR ANY DIRECT OR INDIRECT DAMAGES ARISING FROM THE USE OF THIS SOFTWARE.
+
+────────────────────────────────
+V. Miscellaneous
+────────────────────────────────
+
+1. If you breach this License, the copyright holder may terminate the rights granted to you hereunder.
+
+2. Any rights not expressly granted herein are reserved by the copyright holder.
+
+3. When you distribute this software or a modified version, you must include the complete text of this License.
+
+────────────────────────────────
+Note on language versions
+────────────────────────────────
+
+A Chinese-language version of this License is provided in the `LICENSE` file in this repository. The two versions are intended to express the same intent; if any provision is understood differently, the parties should interpret them in good faith and consistent purpose.
