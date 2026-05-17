@@ -18,6 +18,7 @@ const loadingIndicators = ref(false)
 
 const err = ref('')
 const loading = ref(false)
+const editingId = ref<number | null>(null)
 
 const pid = computed(() => Number(props.personId))
 const sid = computed(() => Number(props.sessionId))
@@ -92,8 +93,56 @@ function pickIndicator(i: Indicator) {
 }
 
 function clearPick() {
+  if (editingId.value !== null) return
   pickedIndicator.value = null
   form.value.indicator_id = ''
+}
+
+function indicatorFromObservation(o: Observation): Indicator {
+  return {
+    id: o.indicator_id,
+    parent_id: o.indicator_parent_id,
+    name: o.indicator_name,
+    category: o.indicator_category,
+    is_narrative: o.indicator_is_narrative,
+    unit: o.indicator_unit,
+    ref_range_hint: o.indicator_ref_range_hint ?? null,
+    organ_ids: o.organ_ids,
+  }
+}
+
+function resetValueFields() {
+  form.value.value_text = ''
+  form.value.ref_text = ''
+  form.value.abnormal = ''
+  form.value.remarks = ''
+  form.value.findings_text = ''
+  form.value.conclusion_text = ''
+}
+
+function cancelEdit() {
+  editingId.value = null
+  clearPick()
+  resetValueFields()
+  if (session.value) {
+    form.value.measured_at = toLocal(session.value.report_at)
+  }
+}
+
+function startEdit(o: Observation) {
+  editingId.value = o.id
+  err.value = ''
+  pickedIndicator.value = indicatorFromObservation(o)
+  form.value.indicator_id = o.indicator_id
+  form.value.measured_at = toLocal(o.measured_at)
+  form.value.value_text = o.value_text ?? ''
+  form.value.ref_text = o.ref_text ?? ''
+  form.value.abnormal =
+    o.abnormal === null || o.abnormal === undefined ? '' : o.abnormal ? 'yes' : 'no'
+  form.value.remarks = o.remarks ?? ''
+  form.value.findings_text = o.findings_text ?? ''
+  form.value.conclusion_text = o.conclusion_text ?? ''
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function load() {
@@ -125,6 +174,28 @@ function toLocal(iso: string): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
 
+function parseAbnormalFromForm(): boolean | null {
+  if (form.value.abnormal === '') return null
+  return form.value.abnormal === 'yes'
+}
+
+function buildObservationBody() {
+  const ind = pickedIndicator.value!
+  const narrative = ind.is_narrative
+  return {
+    indicator_id: ind.id,
+    measured_at: form.value.measured_at
+      ? new Date(form.value.measured_at).toISOString()
+      : null,
+    value_text: narrative ? null : form.value.value_text || null,
+    ref_text: narrative ? null : form.value.ref_text || null,
+    abnormal: parseAbnormalFromForm(),
+    remarks: form.value.remarks || null,
+    findings_text: narrative ? form.value.findings_text || null : null,
+    conclusion_text: narrative ? form.value.conclusion_text || null : null,
+  }
+}
+
 async function submitObservation() {
   if (!session.value) return
   if (!pickedIndicator.value || form.value.indicator_id === '') {
@@ -132,33 +203,36 @@ async function submitObservation() {
     return
   }
   err.value = ''
-  const narrative = pickedIndicator.value.is_narrative
-  const payload = [
-    {
-      indicator_id: pickedIndicator.value.id,
-      measured_at: form.value.measured_at
-        ? new Date(form.value.measured_at).toISOString()
-        : null,
-      value_text: narrative ? null : form.value.value_text || null,
-      ref_text: narrative ? null : form.value.ref_text || null,
-      abnormal:
-        narrative || form.value.abnormal === ''
-          ? null
-          : form.value.abnormal === 'yes',
-      remarks: form.value.remarks || null,
-      findings_text: narrative ? form.value.findings_text || null : null,
-      conclusion_text: narrative ? form.value.conclusion_text || null : null,
-    },
-  ]
+  const body = buildObservationBody()
   try {
-    await http.post(`/api/persons/${pid.value}/sessions/by-id/${sid.value}/observations`, payload)
-    clearPick()
-    form.value.value_text = ''
-    form.value.ref_text = ''
-    form.value.abnormal = ''
-    form.value.remarks = ''
-    form.value.findings_text = ''
-    form.value.conclusion_text = ''
+    if (editingId.value !== null) {
+      await http.patch(
+        `/api/persons/${pid.value}/sessions/by-id/${sid.value}/observations/${editingId.value}`,
+        body,
+      )
+      cancelEdit()
+    } else {
+      await http.post(
+        `/api/persons/${pid.value}/sessions/by-id/${sid.value}/observations`,
+        [body],
+      )
+      clearPick()
+      resetValueFields()
+    }
+    await load()
+  } catch (e) {
+    err.value = apiError(e)
+  }
+}
+
+async function deleteObservation(id: number) {
+  if (!window.confirm('确定删除这条记录？删除后不可恢复。')) return
+  err.value = ''
+  try {
+    await http.delete(
+      `/api/persons/${pid.value}/sessions/by-id/${sid.value}/observations/${id}`,
+    )
+    if (editingId.value === id) cancelEdit()
     await load()
   } catch (e) {
     err.value = apiError(e)
@@ -197,7 +271,75 @@ onMounted(load)
       <p class="muted">报告时间：{{ fmt(session.report_at) }}</p>
       <div v-if="err" class="err">{{ err }}</div>
 
-      <h4>新增一条记录</h4>
+      <h4>{{ editingId === null ? '新增一条记录' : `修改记录 #${editingId}` }}</h4>
+
+      <div v-if="editingId !== null && selectedInd" class="edit-banner card-inner">
+        <strong>正在修改：</strong>
+        {{ selectedInd.name }}
+        <span class="muted">（{{ catLabel[selectedInd.category] ?? selectedInd.category }}）</span>
+      </div>
+
+      <div
+        v-if="editingId !== null && selectedInd && !selectedInd.is_narrative"
+        class="edit-values card-inner"
+      >
+        <div class="row edit-values-row">
+          <label class="edit-field"
+            >报告值
+            <input v-model="form.value_text" class="edit-input"
+          /></label>
+          <label class="edit-field"
+            >标准值
+            <input
+              v-model="form.ref_text"
+              class="edit-input"
+              :placeholder="selectedInd.ref_range_hint || '参考范围或报告单标准值'"
+            />
+          </label>
+          <label class="edit-field"
+            >是否异常
+            <select v-model="form.abnormal" class="edit-input">
+              <option value="">未填</option>
+              <option value="no">否</option>
+              <option value="yes">是</option>
+            </select>
+          </label>
+          <label class="edit-field grow"
+            >备注
+            <input v-model="form.remarks" class="edit-input"
+          /></label>
+        </div>
+      </div>
+
+      <div v-if="editingId !== null && selectedInd?.is_narrative" class="edit-values card-inner">
+        <div class="row">
+          <label class="grow"
+            >报告显示
+            <textarea v-model="form.findings_text" rows="2"
+          /></label>
+        </div>
+        <div class="row">
+          <label class="grow"
+            >报告结论
+            <textarea v-model="form.conclusion_text" rows="2"
+          /></label>
+        </div>
+        <div class="row edit-values-row">
+          <label class="edit-field"
+            >是否异常
+            <select v-model="form.abnormal" class="edit-input">
+              <option value="">未填</option>
+              <option value="no">否（正常）</option>
+              <option value="yes">是（异常）</option>
+            </select>
+          </label>
+          <label class="edit-field grow"
+            >备注
+            <input v-model="form.remarks" class="edit-input"
+          /></label>
+        </div>
+      </div>
+
       <div class="row">
         <label
           >测量时间
@@ -205,7 +347,7 @@ onMounted(load)
         /></label>
       </div>
 
-      <div class="picker card-inner">
+      <div v-show="editingId === null" class="picker card-inner">
         <div class="picker-head">
           <strong>检查细项</strong>
           <span class="muted small">（叶子节点才可录入；细项多时请用搜索）</span>
@@ -301,7 +443,7 @@ onMounted(load)
         </div>
       </div>
 
-      <template v-if="selectedInd?.is_narrative">
+      <template v-if="editingId === null && selectedInd?.is_narrative">
         <div class="row">
           <label class="grow"
             >报告显示
@@ -314,8 +456,22 @@ onMounted(load)
             <textarea v-model="form.conclusion_text" rows="2"
           /></label>
         </div>
+        <div class="row">
+          <label
+            >是否异常
+            <select v-model="form.abnormal">
+              <option value="">未填</option>
+              <option value="no">否（正常）</option>
+              <option value="yes">是（异常）</option>
+            </select>
+          </label>
+          <label class="grow"
+            >备注
+            <input v-model="form.remarks"
+          /></label>
+        </div>
       </template>
-      <template v-else-if="selectedInd">
+      <template v-else-if="editingId === null && selectedInd">
         <div class="row">
           <label
             >报告值
@@ -340,8 +496,13 @@ onMounted(load)
         </div>
       </template>
 
-      <p>
-        <button type="button" :disabled="!selectedInd" @click="submitObservation">保存本条</button>
+      <p class="form-actions">
+        <button type="button" :disabled="!selectedInd" @click="submitObservation">
+          {{ editingId === null ? '保存本条' : '保存修改' }}
+        </button>
+        <button v-if="editingId !== null" type="button" class="secondary" @click="cancelEdit">
+          取消修改
+        </button>
       </p>
 
       <h4>本批次已有记录</h4>
@@ -352,13 +513,17 @@ onMounted(load)
             <th>项目</th>
             <th>结果</th>
             <th>异常</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="o in observations"
             :key="o.id"
-            :class="{ 'row-abnormal': o.abnormal === true }"
+            :class="{
+              'row-abnormal': o.abnormal === true,
+              'row-editing': editingId === o.id,
+            }"
           >
             <td>{{ fmt(o.measured_at) }}</td>
             <td>
@@ -368,6 +533,12 @@ onMounted(load)
             <td :class="{ 'cell-abnormal': o.abnormal === true }">{{ dispObs(o) }}</td>
             <td :class="{ 'cell-abnormal': o.abnormal === true }">
               {{ abnormalLabel(o.abnormal) }}
+            </td>
+            <td class="obs-actions">
+              <button type="button" class="secondary tiny" @click="startEdit(o)">修改</button>
+              <button type="button" class="danger tiny" @click="deleteObservation(o.id)">
+                删除
+              </button>
             </td>
           </tr>
         </tbody>
@@ -522,5 +693,39 @@ textarea {
 .footnote {
   margin: 0.55rem 0 0;
   font-size: 0.76rem;
+}
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.obs-actions {
+  white-space: nowrap;
+}
+.obs-actions .tiny + .tiny {
+  margin-left: 0.35rem;
+}
+.row-editing {
+  background: rgba(56, 189, 248, 0.1);
+}
+.edit-banner {
+  margin-bottom: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  background: rgba(56, 189, 248, 0.1);
+  border-color: rgba(56, 189, 248, 0.28);
+}
+.edit-values {
+  margin-bottom: 0.85rem;
+}
+.edit-values-row {
+  align-items: flex-start;
+}
+.edit-field {
+  min-width: 8.5rem;
+  flex: 1 1 10rem;
+}
+.edit-input {
+  width: 100%;
+  min-width: 0;
 }
 </style>

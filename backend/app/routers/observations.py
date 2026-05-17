@@ -10,7 +10,7 @@ from app.deps import require_auth
 from app.db import get_db
 from app.indicator_helpers import assert_indicator_is_leaf
 from app.models import ExamSession, Observation, Person
-from app.schemas import ObservationCreateItem, ObservationRead
+from app.schemas import ObservationCreateItem, ObservationRead, ObservationUpdate
 
 router = APIRouter(dependencies=[Depends(require_auth)])
 
@@ -36,6 +36,7 @@ def _to_read(obs: Observation) -> ObservationRead:
         indicator_parent_id=par.id if par else None,
         indicator_parent_name=par.name if par else None,
         indicator_unit=ind.unit,
+        indicator_ref_range_hint=ind.ref_range_hint,
         organ_ids=[o.id for o in organs],
         organ_names=[o.name for o in organs],
         session_report_at=obs.session.report_at,
@@ -74,6 +75,30 @@ batch_router = APIRouter(
     dependencies=[Depends(require_auth)],
 )
 
+
+def _get_session_or_404(person_id: int, session_id: int, db: Session) -> ExamSession:
+    person = db.get(Person, person_id)
+    if not person:
+        raise HTTPException(status_code=404, detail="成员不存在")
+    session = db.get(ExamSession, session_id)
+    if not session or session.person_id != person_id:
+        raise HTTPException(status_code=404, detail="报告批次不存在")
+    return session
+
+
+def _get_observation_or_404(
+    person_id: int,
+    session_id: int,
+    observation_id: int,
+    db: Session,
+) -> Observation:
+    _get_session_or_404(person_id, session_id, db)
+    obs = db.get(Observation, observation_id)
+    if not obs or obs.session_id != session_id:
+        raise HTTPException(status_code=404, detail="观测记录不存在")
+    return obs
+
+
 @batch_router.post("/observations", response_model=List[ObservationRead])
 def batch_create_observations(
     person_id: int,
@@ -83,12 +108,7 @@ def batch_create_observations(
 ):
     if not body:
         return []
-    person = db.get(Person, person_id)
-    if not person:
-        raise HTTPException(status_code=404, detail="成员不存在")
-    session = db.get(ExamSession, session_id)
-    if not session or session.person_id != person_id:
-        raise HTTPException(status_code=404, detail="报告批次不存在")
+    session = _get_session_or_404(person_id, session_id, db)
 
     created: List[Observation] = []
     for item in body:
@@ -119,12 +139,7 @@ def list_session_observations(
     session_id: int,
     db: Session = Depends(get_db),
 ):
-    person = db.get(Person, person_id)
-    if not person:
-        raise HTTPException(status_code=404, detail="成员不存在")
-    session = db.get(ExamSession, session_id)
-    if not session or session.person_id != person_id:
-        raise HTTPException(status_code=404, detail="报告批次不存在")
+    _get_session_or_404(person_id, session_id, db)
     rows = (
         db.query(Observation)
         .filter(Observation.session_id == session_id)
@@ -132,3 +147,41 @@ def list_session_observations(
         .all()
     )
     return [_to_read(o) for o in rows]
+
+
+@batch_router.patch("/observations/{observation_id}", response_model=ObservationRead)
+def update_observation(
+    person_id: int,
+    session_id: int,
+    observation_id: int,
+    body: ObservationUpdate,
+    db: Session = Depends(get_db),
+):
+    session = _get_session_or_404(person_id, session_id, db)
+    obs = _get_observation_or_404(person_id, session_id, observation_id, db)
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        return _to_read(obs)
+    if "indicator_id" in data:
+        assert_indicator_is_leaf(db, data["indicator_id"])
+        obs.indicator_id = data["indicator_id"]
+    if "measured_at" in data:
+        obs.measured_at = data["measured_at"] or session.report_at
+    for field in ("value_text", "ref_text", "abnormal", "remarks", "findings_text", "conclusion_text"):
+        if field in data:
+            setattr(obs, field, data[field])
+    db.commit()
+    db.refresh(obs)
+    return _to_read(obs)
+
+
+@batch_router.delete("/observations/{observation_id}", status_code=204)
+def delete_observation(
+    person_id: int,
+    session_id: int,
+    observation_id: int,
+    db: Session = Depends(get_db),
+):
+    obs = _get_observation_or_404(person_id, session_id, observation_id, db)
+    db.delete(obs)
+    db.commit()

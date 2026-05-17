@@ -155,6 +155,17 @@ class ObservationCreateItem(BaseModel):
     conclusion_text: Optional[str] = None
 
 
+class ObservationUpdate(BaseModel):
+    indicator_id: Optional[int] = None
+    measured_at: Optional[datetime] = None
+    value_text: Optional[str] = Field(None, max_length=500)
+    ref_text: Optional[str] = Field(None, max_length=500)
+    abnormal: Optional[bool] = None
+    remarks: Optional[str] = None
+    findings_text: Optional[str] = None
+    conclusion_text: Optional[str] = None
+
+
 class ObservationRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -174,6 +185,7 @@ class ObservationRead(BaseModel):
     indicator_parent_id: Optional[int]
     indicator_parent_name: Optional[str]
     indicator_unit: Optional[str]
+    indicator_ref_range_hint: Optional[str] = None
     organ_ids: List[int]
     organ_names: List[str]
     session_report_at: datetime

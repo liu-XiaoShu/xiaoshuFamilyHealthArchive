@@ -41,6 +41,32 @@ if [[ -z "${PYBIN}" ]]; then
   fi
 fi
 
+# 将常见 Node 安装目录加入 PATH（未装到系统 PATH 时仍可启动前端）
+for _node_dir in \
+  "${NODE_HOME:-}" \
+  "${HOME}/.local/node/bin" \
+  "${NVM_DIR:-$HOME/.nvm}/versions/node/$(cat "${NVM_DIR:-$HOME/.nvm}/alias/default" 2>/dev/null)/bin"; do
+  if [[ -n "${_node_dir}" && -x "${_node_dir}/npm" ]]; then
+    export PATH="${_node_dir}:${PATH}"
+    break
+  fi
+done
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "错误: 未找到 npm（Node.js）。前端无法启动。" >&2
+  echo "  请先安装 Node.js LTS（建议 20+），并在 frontend 目录执行: npm install" >&2
+  echo "  安装示例: nvm install --lts  或  https://nodejs.org/" >&2
+  echo "  若已安装到自定义目录: export PATH=\"/path/to/node/bin:\$PATH\"" >&2
+  exit 1
+fi
+
+NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+if [[ "${NODE_MAJOR}" -lt 18 ]]; then
+  echo "错误: Node.js 版本过低（当前 $(node -v)，需要 >= 18，Vite 6 无法运行）。" >&2
+  echo "  Ubuntu 自带 nodejs 常为 10.x，请改用 LTS：nvm install --lts  或安装到 ~/.local/node" >&2
+  exit 1
+fi
+
 echo "== 释放端口 8000、5173（如有占用）…"
 kill_tcp_port 8000
 kill_tcp_port 5173

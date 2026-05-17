@@ -84,6 +84,7 @@ export interface Observation {
   indicator_parent_id: number | null
   indicator_parent_name: string | null
   indicator_unit: string | null
+  indicator_ref_range_hint?: string | null
   organ_ids: number[]
   organ_names: string[]
   session_report_at: string
